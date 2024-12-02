@@ -1,5 +1,5 @@
 import { useParams } from "@solidjs/router";
-import { createResource, createSignal } from "solid-js";
+import { createResource, createSignal, Show } from "solid-js";
 import QRCode from "qrcode";
 import { GameBoard } from "../components/GameBoard";
 import { GameTimer } from "../components/GameTimer";
@@ -26,13 +26,18 @@ export default function GameRoom() {
 
   return (
     <main class="text-center mx-auto text-gray-700 p-4">
-      <WinMessage hasWon={hasWon()} />
-
-      <GameTimer
-        cooldown={cooldown()}
-        currentEmoji={currentEmoji()}
-        hasWon={hasWon()}
-      />
+      <Show
+        when={hasWon()}
+        fallback={
+          <GameTimer
+            cooldown={cooldown()}
+            currentEmoji={currentEmoji()}
+            hasWon={hasWon()}
+          />
+        }
+      >
+        <WinMessage />
+      </Show>
 
       <GameBoard
         board={board()}
