@@ -1,10 +1,20 @@
 import { useParams } from "@solidjs/router";
-import { createResource, createSignal, Show } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  onCleanup,
+  Show,
+} from "solid-js";
 import QRCode from "qrcode";
 import { GameBoard } from "../components/GameBoard";
 import { GameTimer } from "../components/GameTimer";
 import { ShareGame } from "../components/ShareGame";
 import { WinMessage } from "../components/WinMessage";
+import PartySocket from "partysocket";
+import { checkWin } from "../utils/gameLogic";
+
+const COOLDOWN_SECONDS = 1;
 
 export default function GameRoom() {
   const params = useParams<{ gameId: string }>();
@@ -18,11 +28,49 @@ export default function GameRoom() {
     initialValue: ``,
   });
 
+  const ws = new PartySocket({
+    host: "localhost:1999",
+    query: async () => ({}),
+  });
+  createEffect(() => {
+    ws.updateProperties({ room: params.gameId });
+  });
+  function messageHandler(message: MessageEvent) {}
+  ws.addEventListener("message", messageHandler);
+  onCleanup(() => {
+    ws.close();
+  });
+
   // Game state management
   const emojis = ["🎈", "🌟", "🎨", "🎮", "🎪"];
   const [currentEmoji] = createSignal(
     emojis[Math.floor(Math.random() * emojis.length)]
   );
+
+  const handleCellClick = (index: number) => {
+    if (board()[index] === null && cooldown() === 0 && !hasWon()) {
+      const newBoard = [...board()];
+      newBoard[index] = currentEmoji();
+      setBoard(newBoard);
+
+      if (checkWin(newBoard, currentEmoji(), setWinningCells)) {
+        setHasWon(true);
+        return;
+      }
+
+      // Start cooldown
+      setCooldown(COOLDOWN_SECONDS);
+      const timer = setInterval(() => {
+        setCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
 
   return (
     <main class="text-center mx-auto text-gray-700 p-4">
@@ -41,14 +89,10 @@ export default function GameRoom() {
 
       <GameBoard
         board={board()}
-        setBoard={setBoard}
+        handleCellClick={handleCellClick}
         cooldown={cooldown()}
-        setCooldown={setCooldown}
-        currentEmoji={currentEmoji()}
         hasWon={hasWon()}
-        setHasWon={setHasWon}
         winningCells={winningCells()}
-        setWinningCells={setWinningCells}
       />
 
       <ShareGame
